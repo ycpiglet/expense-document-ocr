@@ -1,0 +1,12 @@
+{
+  "documentType": "receipt",
+  "merchant": "커피체리 테스트상점",
+  "transactionDate": "2026-09-17",
+  "totalAmount": 33000,
+  "supplyAmount": 30000,
+  "vatAmount": 3000,
+  "approvalNumber": "12345678",
+  "cardLast4": "1234",
+  "businessNumber": "123-45-67890",
+  "currency": "KRW"
+}
