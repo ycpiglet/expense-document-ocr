@@ -1,6 +1,6 @@
 import type { DocumentType, Extraction } from "./types.js"
 
-export const PARSER_VERSION = "receipt-parser-v1"
+export const PARSER_VERSION = "receipt-parser-v2"
 const clean = (value: string) => value.replace(/\s+/g, " ").trim()
 const digits = (value: string) => Number(value.replace(/[^0-9.-]/g, ""))
 
@@ -45,7 +45,7 @@ function detectDocumentType(text: string): DocumentType {
 }
 
 function fallbackMerchant(lines: string[]): string | null {
-  const ignored = /영수증|매출전표|세금계산서|거래명세|승인|사업자|전화|대표|주소|합계|금액|부가세|공급가액|카드|일시|날짜/i
+  const ignored = /^(?:---\s*)?page\s+\d+(?:\s*---)?$|영수증|매출전표|세금계산서|거래명세|승인|사업자|전화|대표|주소|합계|금액|부가세|공급가액|카드|일시|날짜/i
   return lines.find((line) => line.length >= 2 && line.length <= 50 && !ignored.test(line) && !/^[-\d\s.,/:()]+$/.test(line)) ?? null
 }
 

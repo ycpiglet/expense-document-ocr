@@ -25,3 +25,11 @@ export type Evaluation = {
   fieldResults: Record<string, { expected: unknown; actual: unknown; matched: boolean }>
   errors: string[]
 }
+
+export type OcrProcessingMetadata = {
+  requestedFiles: number
+  processedFiles: number
+  failedFiles: number
+  truncatedFiles: number
+  warnings: string[]
+}

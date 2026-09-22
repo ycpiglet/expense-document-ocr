@@ -1,5 +1,5 @@
 import type { Client } from "@notionhq/client"
-import type { Extraction } from "./types.js"
+import type { Extraction, OcrProcessingMetadata } from "./types.js"
 
 type NotionProperty = Record<string, unknown> & { type?: string }
 type PageWithProperties = { properties?: Record<string, NotionProperty> }
@@ -17,7 +17,12 @@ function propertyIsEmpty(property?: NotionProperty): boolean {
   return value == null || (Array.isArray(value) && value.length === 0)
 }
 
-const richText = (content: string) => ({ rich_text: [{ type: "text" as const, text: { content: content.slice(0, 2000) } }] })
+const richText = (content: string) => ({
+  rich_text: Array.from({ length: Math.min(50, Math.ceil(content.length / 1900)) }, (_, index) => ({
+    type: "text" as const,
+    text: { content: content.slice(index * 1900, (index + 1) * 1900) },
+  })),
+})
 
 export function getEvidenceFileUrls(page: PageWithProperties): string[] {
   const property = page.properties?.["증빙 자료"]
@@ -34,11 +39,17 @@ export async function downloadFile(url: string): Promise<Uint8Array> {
 
 export async function updateOcrStatus(notion: Client, pageId: string, status: string, error?: string) {
   const properties: Record<string, unknown> = { "OCR 상태": { select: { name: status } } }
-  if (error) properties["OCR 오류"] = richText(error)
+  properties["OCR 오류"] = error ? richText(error) : { rich_text: [] }
   await notion.pages.update({ page_id: pageId, properties: properties as never })
 }
 
-export async function applyExtraction(notion: Client, pageId: string, extraction: Extraction, overwriteExisting = false) {
+export async function applyExtraction(
+  notion: Client,
+  pageId: string,
+  extraction: Extraction,
+  overwriteExisting = false,
+  processing?: OcrProcessingMetadata,
+) {
   const page = await notion.pages.retrieve({ page_id: pageId }) as PageWithProperties
   const candidate: Record<string, unknown> = {
     "사용일": extraction.transactionDate ? { date: { start: extraction.transactionDate } } : undefined,
@@ -52,13 +63,14 @@ export async function applyExtraction(notion: Client, pageId: string, extraction
   }
   const properties: Record<string, unknown> = {}
   for (const [name, value] of Object.entries(candidate)) if (value !== undefined && (overwriteExisting || propertyIsEmpty(page.properties?.[name]))) properties[name] = value
-  properties["OCR 상태"] = { select: { name: extraction.confidence >= 0.8 ? "완료" : "확인 필요" } }
+  const hasWarnings = Boolean(processing?.warnings.length)
+  properties["OCR 상태"] = { select: { name: extraction.confidence >= 0.8 && !hasWarnings ? "완료" : "확인 필요" } }
   properties["OCR 신뢰도"] = { number: extraction.confidence }
   properties["OCR 원문"] = richText(extraction.rawText)
-  properties["OCR 추출 결과"] = richText(JSON.stringify({ ...extraction, rawText: undefined }))
+  properties["OCR 추출 결과"] = richText(JSON.stringify({ ...extraction, rawText: undefined, processing }))
   properties["OCR 문서 유형"] = { select: { name: extraction.documentType } }
   properties["OCR 모델 버전"] = richText(extraction.parserVersion)
   properties["OCR 처리일"] = { date: { start: new Date().toISOString() } }
-  properties["OCR 오류"] = { rich_text: [] }
+  properties["OCR 오류"] = hasWarnings ? richText(processing!.warnings.join(" | ")) : { rich_text: [] }
   await notion.pages.update({ page_id: pageId, properties: properties as never })
 }
